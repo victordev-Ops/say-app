@@ -1,28 +1,48 @@
+// src/middleware.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name) => req.cookies.get(name)?.value ?? undefined,
-        set: (name, value, options) =>
-          res.cookies.set(name, value, options),
-        remove: (name, options) => res.cookies.delete(name, options),
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value)  // For internal Supabase logic
+            response.cookies.set(name, value, options)  // For browser
+          })
+        },
       },
     }
   )
 
-  const { data } = await supabase.auth.getUser()
+  // Refresh session / get user
+  await supabase.auth.getUser()
 
-  if (!data.user && req.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/login', req.url))
+  // Protection logic
+  if (!supabase.auth.getUser().then(({ data }) => data.user) && request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  return res
+  return response
 }
+
+export const config = {
+  matcher: [
+    '/dashboard/:path*',
+    // Run on all paths except static assets
+    '/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)',
+  ],
+              }
