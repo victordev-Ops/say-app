@@ -2,8 +2,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export const createSupabaseServerClient = () => {
-  const cookieStore = cookies()
+export const supabaseServer = async () => {
+  const cookieStore = await cookies()  // Async in Next.js 16+
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,8 +19,7 @@ export const createSupabaseServerClient = () => {
               cookieStore.set(name, value, options)
             })
           } catch {
-            // Ignore errors if called from a read-only context (e.g., Server Components)
-            // Middleware will handle persistence if needed
+            // Safe to ignore in read-only server contexts (middleware handles response cookies)
           }
         },
       },
