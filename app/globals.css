@@ -24,3 +24,6 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+body { font-family: system-ui; background: #f9fafb; }
+.input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; }
+.btn-primary { background: black; color: white; padding: 12px; border-radius: 12px; }
