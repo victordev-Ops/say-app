@@ -4,10 +4,12 @@ import { supabaseServer } from '@/lib/supabase/server'
 export async function signUp(email: string) {
   const supabase = await supabaseServer()
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') // remove trailing slash if any
+  // Use env var if available, otherwise fall back to production URL
+  let siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') // remove trailing slash
 
   if (!siteUrl) {
-    throw new Error('Site URL not configured')
+    console.warn('NEXT_PUBLIC_SITE_URL not set – falling back to production URL')
+    siteUrl = 'https://sayappz.netlify.app'
   }
 
   const { error } = await supabase.auth.signInWithOtp({
@@ -21,4 +23,4 @@ export async function signUp(email: string) {
     console.error('Supabase OTP error:', error)
     throw new Error(error.message || 'Failed to send magic link')
   }
-      }
+}
