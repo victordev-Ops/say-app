@@ -3,6 +3,8 @@ import { supabaseServer } from '@/lib/supabase/server'
 import LogoutButton from '@/components/LogoutButton'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
   const supabase = await supabaseServer()
 
@@ -11,16 +13,24 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser()
 
   let profile = null
+  let confessions = []
+
   if (user) {
-    const { data, error } = await supabase
+    const { data: prof } = await supabase
       .from('profiles')
       .select('username, slug')
       .eq('id', user.id)
       .single()
 
-    if (!error && data) {
-      profile = data
-    }
+    profile = prof
+
+    const { data: msgs } = await supabase
+      .from('confessions')
+      .select('id, message, created_at')
+      .eq('profile_id', user.id)
+      .order('created_at', { ascending: false })
+
+    confessions = msgs || []
   }
 
   const name = profile?.username ?? 'Anonymous'
@@ -29,70 +39,91 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-8">
-        <h1 className="text-3xl font-bold text-center mb-8">Your Dashboard</h1>
+      <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow-xl p-8">
+        <h1 className="text-4xl font-bold text-center mb-10">Your Say Dashboard</h1>
 
-        {/* Profile Info */}
-        <div className="space-y-4 text-center">
+        <div className="space-y-8 text-center">
           <div>
-            <p className="text-sm text-gray-600">Display Name</p>
-            <p className="text-xl font-semibold">{name}</p>
+            <p className="text-sm text-gray-600">Your Name</p>
+            <p className="text-2xl font-bold">{name}</p>
           </div>
 
           <div>
-            <p className="text-sm text-gray-600">Your Unique Link</p>
-            <div className="mt-2 p-4 bg-gray-100 rounded-xl font-mono text-sm break-all">
+            <p className="text-sm text-gray-600 mb-3">Share this link:</p>
+            <div className="p-5 bg-gray-100 rounded-2xl font-mono text-sm break-all">
               {confessUrl}
             </div>
-          </div>
-
-          <div className="pt-4">
-            <p className="text-sm text-gray-500">
-              Share this link so people can send you anonymous confessions!
+            <p className="mt-4 text-sm text-gray-500">
+              Anyone with this link can send you anonymous confessions!
             </p>
           </div>
         </div>
 
-        {/* Auth Status */}
-        <div className="mt-10 pt-8 border-t border-gray-200">
-          {user ? (
-            <div className="space-y-4">
-              <p className="text-center text-sm text-gray-600">
-                Logged in as <span className="font-medium">{user.email}</span>
-              </p>
+        {/* Confessions Inbox - Only visible to owner */}
+        {user && (
+          <div className="mt-12 pt-8 border-t-2 border-gray-200">
+            <h2 className="text-2xl font-bold text-center mb-6">
+              Your Confessions ({confessions.length})
+            </h2>
 
-              <div className="flex flex-col gap-3">
+            {confessions.length === 0 ? (
+              <p className="text-center text-gray-500 py-10 text-lg">
+                No confessions yet. Share your link and check back soon! ✨
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {confessions.map((c) => (
+                  <div
+                    key={c.id}
+                    className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-6"
+                  >
+                    <p className="text-gray-800 italic text-lg">"{c.message}"</p>
+                    <p className="text-xs text-gray-500 mt-4 text-right">
+                      {new Date(c.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Auth Section */}
+        <div className="mt-12 pt-8 border-t border-gray-200">
+          {user ? (
+            <div className="space-y-6 text-center">
+              <p className="text-sm text-gray-600">
+                Logged in as <span className="font-semibold">{user.email}</span>
+              </p>
+              <div className="flex flex-col gap-4">
                 <LogoutButton />
                 <Link
                   href="/login"
-                  className="text-center text-sm text-blue-600 hover:underline"
+                  className="text-sm text-blue-600 hover:underline"
                 >
-                  Switch to another account
+                  Switch account
                 </Link>
               </div>
             </div>
           ) : (
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-4">
-                Not logged in — this is a public preview
+              <p className="text-gray-600 mb-6">
+                This is a public preview. Log in to see your confessions.
               </p>
               <Link
                 href="/login"
-                className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+                className="inline-block px-8 py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition"
               >
-                Log in with Email
+                Log In with Email
               </Link>
             </div>
           )}
         </div>
 
-        {/* Optional: Quick actions */}
-        <div className="mt-8 text-center text-xs text-gray-500">
-          <p>
-            Tip: Bookmark your link or add it to your bio!
-          </p>
-        </div>
+        <p className="mt-10 text-center text-xs text-gray-500">
+          Tip: Add your link to your bio, stories, or QR code!
+        </p>
       </div>
     </div>
   )
-}
+              }
