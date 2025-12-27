@@ -1,16 +1,22 @@
-// components/BottomNavbar.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Home, Inbox, Settings } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
 export default function BottomNavbar({ profileId }: { profileId: string }) {
-  const [unreadCount, setUnreadCount] = useState(0)
-  const supabase = createClient()
   const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+  const unreadCountRef = useRef(0)
+  const hasNewMessage = useRef(false)
+
+  // Determine active tab
+  const isHomeActive = pathname === '/dashboard'
+  const isInboxActive = pathname === '/inbox'
+  const isSettingsActive = pathname === '/settings'
 
   // Fetch initial unread count
   useEffect(() => {
@@ -21,18 +27,18 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
         .eq('profile_id', profileId)
         .eq('is_read', false)
 
-      setUnreadCount(count || 0)
+      unreadCountRef.current = count || 0
     }
 
     if (profileId) fetchUnread()
-  }, [profileId])
+  }, [profileId, supabase])
 
-  // Real-time: new message → increase badge
+  // Real-time listener for new confessions
   useEffect(() => {
     if (!profileId) return
 
     const channel = supabase
-      .channel('new-confessions')
+      .channel(`confessions-${profileId}`)
       .on(
         'postgres_changes',
         {
@@ -42,7 +48,10 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
           filter: `profile_id=eq.${profileId}`,
         },
         () => {
-          setUnreadCount((prev) => prev + 1)
+          unreadCountRef.current += 1
+          hasNewMessage.current = true
+          // Trigger re-render
+          router.refresh() // Soft refresh to update badge without full reload
         }
       )
       .subscribe()
@@ -50,74 +59,120 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [profileId])
+  }, [profileId, supabase, router])
 
-  // Mark all as read when visiting /inbox
+  // Mark all as read when inbox is visited
   useEffect(() => {
-    if (pathname === '/inbox' && unreadCount > 0) {
+    if (isInboxActive && unreadCountRef.current > 0) {
+      // Optimistic update
+      unreadCountRef.current = 0
+      hasNewMessage.current = false
+
+      // Fire and forget — no need to await
       supabase
         .from('confessions')
         .update({ is_read: true })
         .eq('profile_id', profileId)
         .eq('is_read', false)
-
-      setUnreadCount(0)
+        .then(() => router.refresh())
     }
-  }, [pathname, profileId, unreadCount])
+  }, [isInboxActive, profileId, supabase, router])
 
-  // Determine active states
-  const isHomeActive = pathname === '/dashboard'
-  const isInboxActive = pathname === '/inbox'
-  const isSettingsActive = pathname === '/settings'
+  const unreadCount = unreadCountRef.current
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-gray-200 px-4 py-3 z-50">
       <div className="max-w-2xl mx-auto">
-        <div className="flex justify-between items-center">
-          {/* Home Icon */}
+        <div className="flex justify-around items-center">
+          {/* Home */}
           <Link
             href="/dashboard"
-            className={`p-3 rounded-xl transition-all ${
+            prefetch={true}
+            className={`group relative flex flex-col items-center gap-1 p-4 rounded-2xl transition-all duration-200 ${
               isHomeActive
-                ? 'text-purple-600 bg-purple-50'
-                : 'text-gray-600 hover:text-purple-600'
+                ? 'text-purple-600'
+                : 'text-gray-500 hover:text-purple-600'
             }`}
+            onClick={(e) => {
+              if (isHomeActive) e.preventDefault()
+            }}
           >
-            <Home size={28} strokeWidth={2.5} />
+            <Home size={26} strokeWidth={2.5} className="group-active:scale-90 transition-transform" />
+            <span className="text-xs font-medium">Home</span>
+            {isHomeActive && (
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-12 h-1 bg-purple-600 rounded-full" />
+            )}
           </Link>
 
-          {/* Inbox Icon (Center) */}
+          {/* Inbox (Center - Prominent) */}
           <Link
             href="/inbox"
-            className={`relative p-4 rounded-full transition-all ${
+            prefetch={true}
+            className={`relative -mt-6 p-5 rounded-full transition-all duration-300 shadow-lg ${
               isInboxActive
-                ? 'bg-purple-100 text-purple-600 scale-110 shadow-lg'
-                : 'text-gray-600 hover:text-purple-600'
+                ? 'bg-purple-600 text-white scale-110 shadow-purple-300'
+                : 'bg-white text-gray-700 ring-4 ring-purple-100 shadow-xl'
             }`}
+            onClick={(e) => {
+              if (isInboxActive) e.preventDefault()
+            }}
           >
-            <Inbox size={32} strokeWidth={2.5} />
+            <Inbox size={32} strokeWidth={2.5} className="relative z-10" />
 
-            {/* Notification Badge */}
+            {/* Smart Badge: Only animate on new messages */}
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[22px] h-6 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse shadow-lg">
+              <span
+                className={`absolute -top-2 -right-2 flex items-center justify-center min-w-6 h-6 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg transition-all ${
+                  hasNewMessage.current ? 'animate-ping-once' : ''
+                }`}
+              >
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </Link>
 
-          {/* Settings Icon */}
+          {/* Settings */}
           <Link
             href="/settings"
-            className={`p-3 rounded-xl transition-all ${
+            prefetch={true}
+            className={`group relative flex flex-col items-center gap-1 p-4 rounded-2xl transition-all duration-200 ${
               isSettingsActive
-                ? 'text-purple-600 bg-purple-50'
-                : 'text-gray-600 hover:text-purple-600'
+                ? 'text-purple-600'
+                : 'text-gray-500 hover:text-purple-600'
             }`}
+            onClick={(e) => {
+              if (isSettingsActive) e.preventDefault()
+            }}
           >
-            <Settings size={28} strokeWidth={2.5} />
+            <Settings size={26} strokeWidth={2.5} className="group-active:scale-90 transition-transform" />
+            <span className="text-xs font-medium">Settings</span>
+            {isSettingsActive && (
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-12 h-1 bg-purple-600 rounded-full" />
+            )}
           </Link>
         </div>
       </div>
+
+      {/* Custom animation for new message pulse */}
+      <style jsx>{`
+        @keyframes ping-once {
+          0% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1.4);
+            opacity: 0.8;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+        .animate-ping-once {
+          animation: ping-once 0.6s cubic-bezier(0.4, 0, 0.6, 1);
+        }
+      `}</style>
     </div>
   )
-      }
+          }
