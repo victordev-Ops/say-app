@@ -6,33 +6,44 @@ import { createClient } from '@/lib/supabase/client'
 import { RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-//import { formatRelativeTime } from '@/lib/utils' // We'll add this helper below
 
 type Confession = {
   id: string
   message: string
   created_at: string
   is_read: boolean
+  profile_id: string
 }
 
 export default function InboxPage() {
   const [confessions, setConfessions] = useState<Confession[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  
   const supabase = createClient()
   const router = useRouter()
 
-  const fetchConfessions = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/dashboard')
-      return
+  // Get current user once on mount
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/dashboard')
+        return
+      }
+      setCurrentUserId(user.id)
     }
+    getUser()
+  }, [router])
+
+  const fetchConfessions = async () => {
+    if (!currentUserId) return
 
     const { data } = await supabase
       .from('confessions')
-      .select('id, message, created_at, is_read')
-      .eq('profile_id', user.id)
+      .select('id, message, created_at, is_read, profile_id')
+      .eq('profile_id', currentUserId)
       .order('created_at', { ascending: false })
 
     setConfessions(data || [])
@@ -40,57 +51,74 @@ export default function InboxPage() {
     setRefreshing(false)
 
     // Mark all as read
-    if (data && data.some(c => !c.is_read)) {
+    const hasUnread = data?.some(c => !c.is_read)
+    if (hasUnread) {
       await supabase
         .from('confessions')
         .update({ is_read: true })
-        .eq('profile_id', user.id)
+        .eq('profile_id', currentUserId)
         .eq('is_read', false)
     }
   }
 
+  // Initial load + refresh
   useEffect(() => {
-    fetchConfessions()
+    if (currentUserId) {
+      fetchConfessions()
+    }
+  }, [currentUserId])
 
-    const channel = supabase
-      .channel('confessions-rt')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'confessions' },
-        (payload) => {
-          const { data: { user } } = supabase.auth.getUserSync() // or use session
-          if ((payload.new as any).profile_id === user?.id) {
-            setConfessions(prev => [payload.new as Confession, ...prev])
-          }
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [])
-
+  // Pull to refresh
   const handleRefresh = () => {
     setRefreshing(true)
     fetchConfessions()
   }
 
-  // Helper for relative time like "2 months ago"
+  // Real-time subscription
+  useEffect(() => {
+    if (!currentUserId) return
+
+    const channel = supabase
+      .channel('confessions-rt')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'confessions',
+        },
+        (payload) => {
+          const newConfession = payload.new as Confession
+          // Only add if it's for the current user
+          if (newConfession.profile_id === currentUserId) {
+            setConfessions(prev => [newConfession, ...prev])
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [currentUserId])
+
+  // Relative time formatter
   const relativeTime = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
     if (diffInSeconds < 60) return 'just now'
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
-    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`
-    if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)} months ago`
-    return `${Math.floor(diffInSeconds / 31536000)} years ago`
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`
+    if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}mo ago`
+    return `${Math.floor(diffInSeconds / 31536000)}y ago`
   }
 
   return (
     <div className="min-h-screen bg-white pb-32">
-      {/* Simple Header */}
+      {/* Header */}
       <div className="sticky top-0 bg-white border-b border-gray-200 z-10 px-6 py-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Inbox</h1>
         <button onClick={handleRefresh} disabled={refreshing}>
@@ -98,13 +126,10 @@ export default function InboxPage() {
         </button>
       </div>
 
-      {/* Pull-to-refresh spinner */}
       {refreshing && <div className="py-2 text-center"><RefreshCw className="animate-spin inline" size={28} /></div>}
 
-      {/* Message List */}
       <div className="divide-y divide-gray-200">
         {loading ? (
-          // Skeleton
           Array(5).fill(0).map((_, i) => (
             <div key={i} className="px-6 py-5 flex items-center gap-4 animate-pulse">
               <div className="w-12 h-12 bg-gray-200 rounded-full" />
@@ -133,14 +158,12 @@ export default function InboxPage() {
               {/* Envelope Icon */}
               <div className="w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center shadow-md">
                 {c.is_read ? (
-                  // Soft gray envelope with heart for read
                   <div className="bg-gradient-to-br from-gray-100 to-gray-200 p-3 rounded-full">
                     <svg className="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
                     </svg>
                   </div>
                 ) : (
-                  // Vibrant red/orange gradient for unread
                   <div className="bg-gradient-to-br from-red-400 via-pink-500 to-orange-400 p-3 rounded-full shadow-lg">
                     <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
@@ -149,13 +172,13 @@ export default function InboxPage() {
                 )}
               </div>
 
-              {/* Text Content */}
+              {/* Message Preview */}
               <div className="flex-1 min-w-0">
                 <p className={`font-medium truncate ${!c.is_read ? 'text-red-600 font-bold' : 'text-gray-900'}`}>
                   {!c.is_read ? 'New Message!' : c.message || 'Empty message'}
                 </p>
                 <p className="text-sm text-gray-500">
-                  {c.is_read ? relativeTime(c.created_at) : relativeTime(c.created_at)}
+                  {relativeTime(c.created_at)}
                 </p>
               </div>
 
@@ -169,4 +192,4 @@ export default function InboxPage() {
       </div>
     </div>
   )
-            }
+      }
