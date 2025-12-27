@@ -5,48 +5,66 @@ import { notFound, redirect } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 
 interface PageProps {
-  // In Next.js 15, params and searchParams are Promises
   params: Promise<{ slug?: string }>
   searchParams: Promise<{ status?: string; error?: string }>
 }
 
 export default async function ConfessPage({ params, searchParams }: PageProps) {
-  // 1. Await the params and searchParams (Critical for Next.js 15)
+  // Await params and searchParams
   const { slug: rawSlug } = await params
   const { status, error: urlError } = await searchParams
 
   const slug = rawSlug?.trim().toLowerCase()
 
+  // 🔎 Debug logs
+  console.log('[ConfessPage] Incoming request:', {
+    rawSlug,
+    normalizedSlug: slug,
+    status,
+    urlError,
+  })
+
   if (!slug) {
+    console.warn('[ConfessPage] No slug provided, returning 404')
     notFound()
   }
 
   const supabase = await supabaseServer()
 
-  // 2. Fetch the profile to ensure the user exists
+  // Fetch profile
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, username')
+    .select('id, username, slug')
     .eq('slug', slug)
     .single()
 
-  // If the database query fails or user isn't found, trigger 404
+  console.log('[ConfessPage] Supabase profile query result:', {
+    profile,
+    profileError,
+  })
+
   if (profileError || !profile) {
-    console.error('Profile fetch error:', profileError)
+    console.error('[ConfessPage] Profile fetch error:', profileError)
     notFound()
   }
 
   const { id: profileId, username } = profile
 
-  // 3. Define the Server Action
+  // Server Action
   async function sendConfession(formData: FormData) {
     'use server'
-    
-    // Initialize a separate client inside the action
+
     const supabaseAction = await supabaseServer()
     const message = (formData.get('message') as string)?.trim()
 
+    console.log('[sendConfession] Attempting insert:', {
+      slug,
+      profileId,
+      messageLength: message?.length,
+    })
+
     if (!message || message.length < 1 || message.length > 1000) {
+      console.warn('[sendConfession] Invalid message length')
       redirect(`/confess/${slug}?error=Message must be 1–1000 characters`)
     }
 
@@ -58,10 +76,11 @@ export default async function ConfessPage({ params, searchParams }: PageProps) {
       })
 
     if (insertError) {
-      console.error('Insert failed:', insertError)
+      console.error('[sendConfession] Insert failed:', insertError)
       redirect(`/confess/${slug}?error=Failed to send confession`)
     }
 
+    console.log('[sendConfession] Insert success for profile:', profileId)
     redirect(`/confess/${slug}?status=success`)
   }
 
@@ -123,5 +142,4 @@ export default async function ConfessPage({ params, searchParams }: PageProps) {
       </div>
     </div>
   )
-      }
-        
+              }
