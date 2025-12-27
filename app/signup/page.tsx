@@ -34,5 +34,12 @@ export default function Signup() {
       </form>
       {message && <p className="mt-3 text-sm text-center text-gray-600">{message}</p>}
     </AuthForm>
+
+    <p className="mt-6 text-center text-sm text-gray-600">
+  Already have an account?{' '}
+  <a href="/login" className="text-blue-600 hover:underline">
+    Log in
+  </a>
+</p>
   )
 }
