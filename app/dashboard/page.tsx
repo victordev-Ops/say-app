@@ -1,11 +1,11 @@
-// app/dashboard/page.tsx (Fully Client Component Version)
+// app/dashboard/page.tsx (Logout removed, as requested)
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client"; // Client-side Supabase
-import LogoutButton from "@/components/LogoutButton";
+import { createClient } from "@/lib/supabase/client";
 import BottomNavbar from "@/components/BottomNavbar";
 import { Copy, Check } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +51,6 @@ export default function DashboardPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      // Fallback for older browsers
       const textArea = document.createElement("textarea");
       textArea.value = confessUrl;
       document.body.appendChild(textArea);
@@ -105,35 +104,21 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            {/* Auth Section */}
+            {/* Settings Link (optional replacement for logout visibility) */}
             <div className="pt-8 border-t border-gray-200">
-              {user ? (
-                <div className="space-y-6">
-                  <p className="text-sm text-gray-600">
-                    Logged in as <span className="font-semibold">{user.email}</span>
-                  </p>
-                  <LogoutButton />
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <p className="text-gray-600">
-                    This is a public preview. Log in to manage your confessions.
-                  </p>
-                  <a
-                    href="/login"
-                    className="inline-block px-8 py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition"
-                  >
-                    Log In with Email
-                  </a>
-                </div>
-              )}
+              <Link
+                href="/settings"
+                className="text-purple-600 hover:underline text-sm"
+              >
+                Settings
+              </Link>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Bottom Navbar - only for logged-in users with profile */}
+      {/* Bottom Navbar */}
       {user && profile && <BottomNavbar profileId={user.id} />}
     </>
   );
-}
+    }
