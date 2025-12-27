@@ -10,22 +10,21 @@ interface PageProps {
 }
 
 export default async function ConfessPage({ params, searchParams }: PageProps) {
-  const slug = params.slug?.trim()
-  const { status, error: urlError } = searchParams
+  const slug = params.slug?.trim().toLowerCase()
 
-  // Early guard: no slug = 404
+  // Early exit if no slug
   if (!slug) {
     notFound()
   }
 
-  const safeSlug = slug.toLowerCase()
+  const { status, error: urlError } = searchParams
 
   const supabase = await supabaseServer()
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('id, username')
-    .eq('slug', safeSlug)
+    .eq('slug', slug)
     .single()
 
   if (profileError || !profile) {
@@ -116,4 +115,4 @@ export default async function ConfessPage({ params, searchParams }: PageProps) {
       </div>
     </div>
   )
-            }
+    }
