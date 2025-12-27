@@ -5,15 +5,14 @@ import { createServerClient } from '@supabase/ssr'
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const token_hash = searchParams.get('token_hash')
-  const type = searchParams.get('type') // 'signup' or 'email' or 'magiclink' etc.
+  const type = searchParams.get('type') // Dynamic: 'email', 'signup', etc.
 
   if (!token_hash || !type) {
     return NextResponse.redirect(new URL('/login?error=invalid_link', req.url))
   }
 
-  // Start with dashboard as target (we'll adjust if needed)
-  let redirectTo = '/dashboard'
-
+  // Temporary redirect response (we'll update location later)
+  let redirectTo = '/dashboard' // Default for returning users
   const response = NextResponse.redirect(new URL(redirectTo, req.url))
 
   const supabase = createServerClient(
@@ -30,18 +29,20 @@ export async function GET(req: NextRequest) {
     }
   )
 
-  // Critical: Use the actual `type` from the URL
+  // Use the dynamic type from the magic link
   const { data, error } = await supabase.auth.verifyOtp({
     token_hash,
-    type: type as any, // Supabase types are limited, but it accepts string
+    type: type as any, // Allows 'email', 'signup', 'magiclink', etc.
   })
 
   if (error || !data.user) {
-    console.error('OTP verification failed:', error)
+    console.error('Magic link verification failed:', error)
     return NextResponse.redirect(new URL('/login?error=auth_failed', req.url))
   }
 
-  // Now check for profile to decide final redirect
+  // Session successfully set via cookies!
+
+  // Check if profile exists
   const { data: profile } = await supabase
     .from('profiles')
     .select('id')
@@ -49,12 +50,10 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
 
   if (!profile) {
-    redirectTo = '/auth/setup' // New user → setup username
+    redirectTo = '/auth/setup' // New user only
   }
-  // Else: returning user → stay on /dashboard
 
-  // Update the redirect location
+  // Final redirect
   response.headers.set('Location', new URL(redirectTo, req.url).toString())
-
   return response
-                                 }
+}
