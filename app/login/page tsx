@@ -58,28 +58,4 @@ export default function Login() {
       </div>
     </div>
   )
-}          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <button type="submit" className="btn-primary mt-2">
-          Send magic link
-        </button>
-      </form>
-
-      {message && (
-        <p className={`mt-4 text-center text-sm ${message.includes('sent') ? 'text-green-600' : 'text-red-600'}`}>
-          {message}
-        </p>
-      )}
-
-      <p className="mt-6 text-center text-sm text-gray-600">
-        New here? Just use your email — we'll create an account if needed.
-      </p>
-
-      <p className="mt-4 text-center text-sm text-gray-600">
-        Don't have an account? It will be created automatically on first login.
-      </p>
-    </AuthForm>
-  )
 }
