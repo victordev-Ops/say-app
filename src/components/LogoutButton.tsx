@@ -9,24 +9,16 @@ export default function LogoutButton() {
 
   const handleLogout = async () => {
     const supabase = createClient()
-    const { error } = await supabase.auth.signOut()
-
-    if (error) {
-      console.error('Logout error:', error)
-      alert('Failed to log out')
-    } else {
-      // Optional: soft refresh to update server-rendered parts
-      router.refresh()
-      // Or redirect if you want: router.push('/')
-    }
+    await supabase.auth.signOut()
+    router.refresh()
   }
 
   return (
     <button
       onClick={handleLogout}
-      className="btn-secondary text-sm"
+      className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition"
     >
       Log out
     </button>
   )
-      }
+}
