@@ -5,6 +5,7 @@ import BottomNavbar from "@/components/BottomNavbar";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Suspense } from "react";
 
+// Critical: These are the EXACT correct names
 const geistSans = GeistSans({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -21,7 +22,9 @@ export const metadata: Metadata = {
 };
 
 function BottomNavbarFallback() {
-  return <div className="fixed bottom-0 left-0 right-0 h-24 bg-gray-50 border-t border-gray-200" />;
+  return (
+    <div className="fixed bottom-0 left-0 right-0 h-24 bg-gray-50 border-t border-gray-200" />
+  );
 }
 
 export default async function RootLayout({
@@ -54,4 +57,4 @@ export default async function RootLayout({
       </body>
     </html>
   );
-}
+    }
