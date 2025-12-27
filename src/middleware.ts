@@ -4,12 +4,14 @@ import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
+  // Start with a response that passes through the request
+  const response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   })
 
+  // Create Supabase server client with proper cookie handling
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -20,29 +22,32 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value)  // For internal Supabase logic
-            response.cookies.set(name, value, options)  // For browser
+            // Update incoming request cookies (for Supabase internal use)
+            request.cookies.set(name, value)
+            // Update outgoing response cookies (for browser)
+            response.cookies.set(name, value, options)
           })
         },
       },
     }
   )
 
-  // Refresh session / get user
+  // Refresh the auth session (this updates cookies if needed)
+  // This is important for SSR pages like /dashboard to have access to the current user
   await supabase.auth.getUser()
 
-  // Protection logic
-  if (!supabase.auth.getUser().then(({ data }) => data.user) && request.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
+  // No protection needed: /dashboard is public
+  // Simply return the response
   return response
 }
 
 export const config = {
   matcher: [
+    // Run middleware on:
+    // - Dashboard and its subpaths (to ensure session is available for SSR)
+    // - All other page routes (for consistent session handling)
+    // - Exclude static files, API routes, etc.
     '/dashboard/:path*',
-    // Run on all paths except static assets
-    '/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)',
   ],
-              }
+      }
