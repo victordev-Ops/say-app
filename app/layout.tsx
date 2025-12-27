@@ -1,12 +1,11 @@
-// app/layout.tsx
-
 import type { Metadata } from "next";
-import { GeistSans, GeistMono } from "next/font/google";  // ← Correct names
+import { GeistSans, GeistMono } from "next/font/google"; // ← Correct: GeistSans & GeistMono
 import "./globals.css";
 import BottomNavbar from "@/components/BottomNavbar";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Suspense } from "react";
 
+// Correct font setup
 const geistSans = GeistSans({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -32,6 +31,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const supabase = await supabaseServer();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -41,7 +41,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`\( {geistSans.variable} \){geistMono.variable} antialiased min-h-screen bg-gray-50 pb-24`}
+        className={`\( {geistSans.variable} \){geistMono.variable} font-sans antialiased min-h-screen bg-gray-50 pb-24`}
       >
         {children}
 
