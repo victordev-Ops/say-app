@@ -35,7 +35,7 @@ export default async function DashboardPage() {
 
   const name = profile?.username ?? 'Anonymous'
   const slug = profile?.slug ?? 'anonymous'
-  const confessUrl = `https://sayappz.netlify.app/confess/${slug}`
+  const confessUrl = `https://say-app.vercel.app/confess/${slug}`
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
