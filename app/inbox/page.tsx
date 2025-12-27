@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { formatRelativeTime } from '@/lib/utils' // We'll add this helper below
+//import { formatRelativeTime } from '@/lib/utils' // We'll add this helper below
 
 type Confession = {
   id: string
