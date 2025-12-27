@@ -1,19 +1,18 @@
 // app/auth/confirm/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { type EmailOtpType } from '@supabase/supabase-js'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const token_hash = searchParams.get('token_hash')
-  const type = searchParams.get('type') as EmailOtpType | null
-
-  // Default fallback redirects
-  let redirectTo = '/dashboard' // We'll decide final destination below
+  const type = searchParams.get('type') // 'signup' or 'email' or 'magiclink' etc.
 
   if (!token_hash || !type) {
     return NextResponse.redirect(new URL('/login?error=invalid_link', req.url))
   }
+
+  // Start with dashboard as target (we'll adjust if needed)
+  let redirectTo = '/dashboard'
 
   const response = NextResponse.redirect(new URL(redirectTo, req.url))
 
@@ -31,10 +30,10 @@ export async function GET(req: NextRequest) {
     }
   )
 
-  // Verify the magic link / OTP
+  // Critical: Use the actual `type` from the URL
   const { data, error } = await supabase.auth.verifyOtp({
     token_hash,
-    type: 'email',
+    type: type as any, // Supabase types are limited, but it accepts string
   })
 
   if (error || !data.user) {
@@ -42,28 +41,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=auth_failed', req.url))
   }
 
-  // Successfully authenticated!
-  // Now check if user has a profile
-  const { data: profile, error: profileError } = await supabase
+  // Now check for profile to decide final redirect
+  const { data: profile } = await supabase
     .from('profiles')
     .select('id')
     .eq('id', data.user.id)
     .maybeSingle()
 
-  if (profileError) {
-    console.error('Profile check error:', profileError)
-    // Optional: fallback to setup if DB error
-    redirectTo = '/auth/setup'
-  } else if (!profile) {
-    // No profile → new user → send to username setup
-    redirectTo = '/auth/setup'
-  } else {
-    // Profile exists → returning user → go straight to dashboard
-    redirectTo = '/dashboard'
+  if (!profile) {
+    redirectTo = '/auth/setup' // New user → setup username
   }
+  // Else: returning user → stay on /dashboard
 
-  // Update redirect with final destination
+  // Update the redirect location
   response.headers.set('Location', new URL(redirectTo, req.url).toString())
 
   return response
-        }
+                                 }
