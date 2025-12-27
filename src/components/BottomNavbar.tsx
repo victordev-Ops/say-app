@@ -1,7 +1,8 @@
+// components/BottomNavbar.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MessageCircle } from 'lucide-react'
+import { Inbox } from 'lucide-react' // Changed to Inbox icon
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -26,7 +27,7 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
     if (profileId) fetchUnread()
   }, [profileId])
 
-  // Listen for new messages in real-time
+  // Real-time: new message → increase badge
   useEffect(() => {
     if (!profileId) return
 
@@ -40,8 +41,7 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
           table: 'confessions',
           filter: `profile_id=eq.${profileId}`,
         },
-        (payload) => {
-          // New message → increment unread count
+        () => {
           setUnreadCount((prev) => prev + 1)
         }
       )
@@ -52,10 +52,9 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
     }
   }, [profileId])
 
-  // Reset unread count when user visits dashboard (optional: mark all as read)
+  // Optional: mark all as read when visiting /inbox
   useEffect(() => {
-    if (pathname === '/dashboard' && unreadCount > 0) {
-      // Optionally auto-mark all as read when opening dashboard
+    if (pathname === '/inbox' && unreadCount > 0) {
       supabase
         .from('confessions')
         .update({ is_read: true })
@@ -64,26 +63,26 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
 
       setUnreadCount(0)
     }
-  }, [pathname, profileId, unreadCount])
+  }, [pathname, profileId])
 
-  const isDashboard = pathname === '/dashboard'
+  const isInboxActive = pathname === '/inbox'
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-50">
       <div className="max-w-2xl mx-auto flex justify-center">
         <Link
-          href="/dashboard"
-          className={`relative p-4 rounded-full transition ${
-            isDashboard
-              ? 'bg-purple-100 text-purple-600'
+          href="/inbox"
+          className={`relative p-4 rounded-full transition-all ${
+            isInboxActive
+              ? 'bg-purple-100 text-purple-600 scale-110'
               : 'text-gray-600 hover:text-purple-600'
           }`}
         >
-          <MessageCircle size={28} strokeWidth={2} />
+          <Inbox size={30} strokeWidth={2.5} />
 
-          {/* Notification Badge / Beacon */}
+          {/* Notification Badge */}
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[22px] h-6 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse shadow-lg">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -91,4 +90,4 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
       </div>
     </div>
   )
-        }
+          }
