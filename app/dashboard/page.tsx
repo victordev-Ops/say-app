@@ -106,7 +106,13 @@ export default function DashboardPage() {
 
             {/* Settings Link (optional replacement for logout visibility) */}
             <div className="pt-8 border-t border-gray-200">
-      
+              <Link
+                href="/settings"
+                className="text-purple-600 hover:underline text-sm"
+              >
+                Settings
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -115,4 +121,4 @@ export default function DashboardPage() {
       {user && profile && <BottomNavbar profileId={user.id} />}
     </>
   );
-    }
+  }
