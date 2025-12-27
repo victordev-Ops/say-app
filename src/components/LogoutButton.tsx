@@ -1,9 +1,11 @@
+// components/LogoutButton.tsx (or wherever it's located)
+
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { LogOut } from 'lucide-react' // Optional: install lucide-react for icons
+import { LogOut } from 'lucide-react'
 
 export default function LogoutButton() {
   const router = useRouter()
@@ -14,17 +16,15 @@ export default function LogoutButton() {
     setIsLoading(true)
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.refresh()
+    
+    // Redirect to settings page after logout
+    router.push('/settings')
+    
     setIsLoading(false)
   }
 
-  const initiateLogout = () => {
-    setShowConfirm(true)
-  }
-
-  const cancelLogout = () => {
-    setShowConfirm(false)
-  }
+  const initiateLogout = () => setShowConfirm(true)
+  const cancelLogout = () => setShowConfirm(false)
 
   return (
     <>
@@ -51,14 +51,14 @@ export default function LogoutButton() {
               <button
                 onClick={cancelLogout}
                 disabled={isLoading}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 transition hover:bg-gray-100"
               >
                 Cancel
               </button>
               <button
                 onClick={handleLogout}
                 disabled={isLoading}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
               >
                 {isLoading ? 'Logging out...' : 'Log out'}
               </button>
@@ -68,4 +68,4 @@ export default function LogoutButton() {
       )}
     </>
   )
-}
+                }
