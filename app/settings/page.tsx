@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import LogoutButton from "@/components/LogoutButton"; // We'll use the improved version
+import LogoutButton from "@/components/LogoutButton";
 import Link from "next/link";
-import { User, Mail, ArrowLeft } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { User, Mail, ArrowLeft, LogIn } from "lucide-react";
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
   const [username, setUsername] = useState<string>("Anonymous");
   const [loading, setLoading] = useState(true);
+  const [justLoggedOut, setJustLoggedOut] = useState(false);
 
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   useEffect(() => {
     async function fetchUserAndProfile() {
@@ -36,8 +40,16 @@ export default function SettingsPage() {
       setLoading(false);
     }
 
+    // Check if we just logged out via URL param
+    if (searchParams.get("loggedOut") === "true") {
+      setJustLoggedOut(true);
+      // Clean up URL without reloading
+      const newUrl = window.location.pathname;
+      router.replace(newUrl, { scroll: false });
+    }
+
     fetchUserAndProfile();
-  }, [supabase]);
+  }, [supabase, searchParams, router]);
 
   if (loading) {
     return (
@@ -52,6 +64,15 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Success Message after Logout */}
+      {justLoggedOut && (
+        <div className="max-w-4xl mx-auto px-6 pt-8">
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-xl text-center font-medium">
+            You have been successfully logged out.
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
@@ -80,8 +101,12 @@ export default function SettingsPage() {
                 <div className="w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mb-4">
                   <User className="h-12 w-12 text-purple-600" />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{username}</p>
-                <p className="text-sm text-gray-500 mt-1">Your display name</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {user ? username : "Guest"}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {user ? "Your display name" : "Log in to customize your profile"}
+                </p>
               </div>
             </div>
 
@@ -91,14 +116,30 @@ export default function SettingsPage() {
                 <Mail className="h-5 w-5 text-gray-600" />
                 Account
               </h2>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-gray-600">Email</p>
-                  <p className="font-medium text-gray-900">{user?.email}</p>
-                </div>
-                <div className="pt-4">
-                  <LogoutButton />
-                </div>
+              <div className="space-y-6">
+                {user ? (
+                  <>
+                    <div>
+                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="font-medium text-gray-900">{user.email}</p>
+                    </div>
+                    <div className="pt-4 border-t">
+                      <LogoutButton />
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600 mb-6">
+                      Log in to access your account settings
+                    </p>
+                    <Link href="/login">
+                      <button className="flex w-full items-center justify-center gap-3 rounded-lg px-6 py-3 font-medium text-blue-600 transition-colors hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <LogIn className="h-5 w-5" />
+                        Log in
+                      </button>
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -111,7 +152,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Sidebar (optional on mobile) */}
+          {/* Sidebar */}
           <div className="md:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sticky top-24">
               <h3 className="font-medium text-gray-900 mb-3">Quick links</h3>
@@ -142,4 +183,4 @@ export default function SettingsPage() {
       </div>
     </div>
   );
-          }
+      }
