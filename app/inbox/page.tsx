@@ -3,9 +3,10 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Inbox, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { formatRelativeTime } from '@/lib/utils' // We'll add this helper below
 
 type Confession = {
   id: string
@@ -38,7 +39,7 @@ export default function InboxPage() {
     setLoading(false)
     setRefreshing(false)
 
-    // Mark all as read when opening inbox
+    // Mark all as read
     if (data && data.some(c => !c.is_read)) {
       await supabase
         .from('confessions')
@@ -51,138 +52,121 @@ export default function InboxPage() {
   useEffect(() => {
     fetchConfessions()
 
-    // Real-time subscription
     const channel = supabase
       .channel('confessions-rt')
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'confessions',
-        },
+        { event: 'INSERT', schema: 'public', table: 'confessions' },
         (payload) => {
-          const { data: { user } } = supabase.auth.getUser()
-          if (payload.new.profile_id === user?.id) {
-            setConfessions((prev) => [payload.new as Confession, ...prev])
+          const { data: { user } } = supabase.auth.getUserSync() // or use session
+          if ((payload.new as any).profile_id === user?.id) {
+            setConfessions(prev => [payload.new as Confession, ...prev])
           }
         }
       )
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
-  const handleRefresh = async () => {
+  const handleRefresh = () => {
     setRefreshing(true)
-    await fetchConfessions()
+    fetchConfessions()
   }
 
-  const formatDate = (dateString: string) => {
+  // Helper for relative time like "2 months ago"
+  const relativeTime = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 3600)
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-    } else if (diffInHours < 48) {
-      return 'Yesterday'
-    } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
-    }
+    if (diffInSeconds < 60) return 'just now'
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`
+    if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)} months ago`
+    return `${Math.floor(diffInSeconds / 31536000)} years ago`
   }
 
   return (
-    <>
-      <div className="min-h-screen bg-gradient-to-b from-purple-50 via-pink-50 to-white pb-32">
-        {/* Header */}
-        <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-gray-200 z-10">
-          <div className="max-w-2xl mx-auto px-6 py-5 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                <Inbox size={28} className="text-purple-600" />
-                Inbox
-              </h1>
-              <p className="text-sm text-gray-500 mt-1">
-                {confessions.length} {confessions.length === 1 ? 'message' : 'messages'}
-              </p>
-            </div>
-
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-2 rounded-full hover:bg-gray-100 transition"
-            >
-              <RefreshCw size={22} className={refreshing ? 'animate-spin' : ''} />
-            </button>
-          </div>
-        </div>
-
-        {/* Pull to Refresh Indicator */}
-        {refreshing && (
-          <div className="flex justify-center py-3">
-            <RefreshCw className="animate-spin text-purple-600" size={24} />
-          </div>
-        )}
-
-        {/* Message List */}
-        <div className="max-w-2xl mx-auto px-6 pt-6">
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-white rounded-2xl p-6 shadow-sm animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-full mb-3"></div>
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                </div>
-              ))}
-            </div>
-          ) : confessions.length === 0 ? (
-            <div className="text-center py-20 px-8">
-              <div className="bg-gray-100 w-32 h-32 rounded-full mx-auto mb-8 flex items-center justify-center">
-                <Inbox size={56} className="text-gray-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-700 mb-3">
-                Your inbox is empty
-              </h3>
-              <p className="text-gray-500 mb-8 max-w-sm mx-auto">
-                Share your link and start receiving anonymous messages from your friends!
-              </p>
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition shadow-lg"
-              >
-                Go to Dashboard
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {confessions.map((confession) => (
-                <div
-                  key={confession.id}
-                  className="bg-white rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-200 border border-gray-100"
-                >
-                  <p className="text-gray-800 text-lg leading-relaxed mb-4">
-                    "{confession.message}"
-                  </p>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">
-                      {formatDate(confession.created_at)}
-                    </span>
-                    {!confession.is_read && (
-                      <span className="w-2.5 h-2.5 bg-purple-600 rounded-full animate-pulse"></span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+    <div className="min-h-screen bg-white pb-32">
+      {/* Simple Header */}
+      <div className="sticky top-0 bg-white border-b border-gray-200 z-10 px-6 py-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Inbox</h1>
+        <button onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw size={24} className={refreshing ? 'animate-spin' : ''} />
+        </button>
       </div>
 
-      {/* Bottom Navbar (already includes the inbox icon with badge) */}
-      {/* It will appear automatically if imported in layout or dashboard */}
-    </>
+      {/* Pull-to-refresh spinner */}
+      {refreshing && <div className="py-2 text-center"><RefreshCw className="animate-spin inline" size={28} /></div>}
+
+      {/* Message List */}
+      <div className="divide-y divide-gray-200">
+        {loading ? (
+          // Skeleton
+          Array(5).fill(0).map((_, i) => (
+            <div key={i} className="px-6 py-5 flex items-center gap-4 animate-pulse">
+              <div className="w-12 h-12 bg-gray-200 rounded-full" />
+              <div className="flex-1">
+                <div className="h-4 bg-gray-200 rounded w-32 mb-2" />
+                <div className="h-3 bg-gray-200 rounded w-24" />
+              </div>
+            </div>
+          ))
+        ) : confessions.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="bg-gray-100 w-24 h-24 rounded-full mx-auto mb-6 flex items-center justify-center">
+              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-medium text-gray-800 mb-2">No messages yet</h3>
+            <p className="text-gray-500 mb-8">Share your link and check back soon!</p>
+            <Link href="/dashboard" className="text-purple-600 font-medium">
+              Go to Dashboard →
+            </Link>
+          </div>
+        ) : (
+          confessions.map((c) => (
+            <div key={c.id} className="px-6 py-5 flex items-center gap-4 hover:bg-gray-50 transition">
+              {/* Envelope Icon */}
+              <div className="w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center shadow-md">
+                {c.is_read ? (
+                  // Soft gray envelope with heart for read
+                  <div className="bg-gradient-to-br from-gray-100 to-gray-200 p-3 rounded-full">
+                    <svg className="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                    </svg>
+                  </div>
+                ) : (
+                  // Vibrant red/orange gradient for unread
+                  <div className="bg-gradient-to-br from-red-400 via-pink-500 to-orange-400 p-3 rounded-full shadow-lg">
+                    <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                    </svg>
+                  </div>
+                )}
+              </div>
+
+              {/* Text Content */}
+              <div className="flex-1 min-w-0">
+                <p className={`font-medium truncate ${!c.is_read ? 'text-red-600 font-bold' : 'text-gray-900'}`}>
+                  {!c.is_read ? 'New Message!' : c.message || 'Empty message'}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {c.is_read ? relativeTime(c.created_at) : relativeTime(c.created_at)}
+                </p>
+              </div>
+
+              {/* Chevron */}
+              <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   )
-      }
+            }
