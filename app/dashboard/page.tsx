@@ -1,104 +1,139 @@
-// app/dashboard/page.tsx (updated - inbox section removed)
-import { supabaseServer } from '@/lib/supabase/server'
-import LogoutButton from '@/components/LogoutButton'
-import Link from 'next/link'
-import BottomNavbar from '@/components/BottomNavbar'
+// app/dashboard/page.tsx (Fully Client Component Version)
+"use client";
 
-export const dynamic = 'force-dynamic'
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client"; // Client-side Supabase
+import LogoutButton from "@/components/LogoutButton";
+import BottomNavbar from "@/components/BottomNavbar";
+import { Copy, Check } from "lucide-react";
 
-export default async function DashboardPage() {
-  const supabase = await supabaseServer()
+export const dynamic = "force-dynamic";
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default function DashboardPage() {
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<{ username: string; slug: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
-  let profile = null
+  const supabase = createClient();
 
-  if (user) {
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('username, slug')
-      .eq('id', user.id)
-      .single()
+  useEffect(() => {
+    async function fetchData() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    profile = prof
+      setUser(user);
+
+      if (user) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("username, slug")
+          .eq("id", user.id)
+          .single();
+
+        setProfile(prof);
+      }
+
+      setLoading(false);
+    }
+
+    fetchData();
+  }, [supabase]);
+
+  const name = profile?.username ?? "Anonymous";
+  const slug = profile?.slug ?? "anonymous";
+  const confessUrl = `https://say-app.vercel.app/confess/${slug}`;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(confessUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = confessUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
   }
-
-  const name = profile?.username ?? 'Anonymous'
-  const slug = profile?.slug ?? 'anonymous'
-  const confessUrl = `https://say-app.vercel.app/confess/${slug}`
 
   return (
     <>
       <div className="min-h-screen bg-gray-50 py-12 px-4 pb-32">
         <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow-xl p-8">
-          <h1 className="text-4xl font-bold text-center mb-10">Your Say Dashboard</h1>
-
-          <div className="space-y-8 text-center">
+          <div className="space-y-12 text-center">
+            {/* Main Share Section */}
             <div>
-              <p className="text-sm text-gray-600">Your Name</p>
-              <p className="text-2xl font-bold">{name}</p>
-            </div>
+              <h2 className="text-3xl font-bold mb-8">{name}</h2>
 
-            <div>
               <p className="text-sm text-gray-600 mb-3">Share this link:</p>
-              <div className="p-5 bg-gray-100 rounded-2xl font-mono text-sm break-all">
-                {confessUrl}
+
+              <div className="relative max-w-md mx-auto">
+                <div className="p-5 bg-gray-100 rounded-2xl font-mono text-sm break-all pr-16">
+                  {confessUrl}
+                </div>
+
+                <button
+                  onClick={handleCopy}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-gray-200 transition"
+                  aria-label="Copy link to clipboard"
+                >
+                  {copied ? (
+                    <Check className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <Copy className="h-5 w-5 text-gray-600" />
+                  )}
+                </button>
               </div>
+
               <p className="mt-4 text-sm text-gray-500">
                 Anyone with this link can send you anonymous confessions!
               </p>
             </div>
 
-            {/* Call to action for inbox */}
-            {user && (
-              <Link
-                href="/inbox"
-                className="inline-block px-8 py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition"
-              >
-                Open Inbox
-              </Link>
-            )}
-          </div>
-
-          {/* Auth Section */}
-          <div className="mt-12 pt-8 border-t border-gray-200">
-            {user ? (
-              <div className="space-y-6 text-center">
-                <p className="text-sm text-gray-600">
-                  Logged in as <span className="font-semibold">{user.email}</span>
-                </p>
-                <div className="flex flex-col gap-4">
+            {/* Auth Section */}
+            <div className="pt-8 border-t border-gray-200">
+              {user ? (
+                <div className="space-y-6">
+                  <p className="text-sm text-gray-600">
+                    Logged in as <span className="font-semibold">{user.email}</span>
+                  </p>
                   <LogoutButton />
-                  <Link href="/login" className="text-sm text-blue-600 hover:underline">
-                    Switch account
-                  </Link>
                 </div>
-              </div>
-            ) : (
-              <div className="text-center">
-                <p className="text-gray-600 mb-6">
-                  This is a public preview. Log in to see your confessions.
-                </p>
-                <Link
-                  href="/login"
-                  className="inline-block px-8 py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition"
-                >
-                  Log In with Email
-                </Link>
-              </div>
-            )}
+              ) : (
+                <div className="space-y-6">
+                  <p className="text-gray-600">
+                    This is a public preview. Log in to manage your confessions.
+                  </p>
+                  <a
+                    href="/login"
+                    className="inline-block px-8 py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition"
+                  >
+                    Log In with Email
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
-
-          <p className="mt-10 text-center text-xs text-gray-500">
-            Tip: Add your link to your bio, stories, or QR code!
-          </p>
         </div>
       </div>
 
-      {/* Bottom Navbar - only for logged-in users */}
+      {/* Bottom Navbar - only for logged-in users with profile */}
       {user && profile && <BottomNavbar profileId={user.id} />}
     </>
-  )
-            }
+  );
+}
