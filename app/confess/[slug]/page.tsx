@@ -14,6 +14,10 @@ export default async function ConfessPage({
   const { slug } = params
   const { status, error: urlError } = searchParams
 
+  console.log('Querying for slug:', slug)
+const { data, error } = await supabase.from('profiles').select('*').eq('slug', slug)
+console.log('Result:', data, 'Error:', error)
+  
   const supabase = await supabaseServer()
 
   // Fetch profile
