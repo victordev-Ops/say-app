@@ -5,44 +5,52 @@ import { notFound, redirect } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 
 interface PageProps {
-  params: { slug?: string }
-  searchParams: { status?: string; error?: string }
+  // In Next.js 15, params and searchParams are Promises
+  params: Promise<{ slug?: string }>
+  searchParams: Promise<{ status?: string; error?: string }>
 }
 
 export default async function ConfessPage({ params, searchParams }: PageProps) {
-  const slug = params.slug?.trim().toLowerCase()
+  // 1. Await the params and searchParams (Critical for Next.js 15)
+  const { slug: rawSlug } = await params
+  const { status, error: urlError } = await searchParams
 
-  // Early exit if no slug
+  const slug = rawSlug?.trim().toLowerCase()
+
   if (!slug) {
     notFound()
   }
 
-  const { status, error: urlError } = searchParams
-
   const supabase = await supabaseServer()
 
+  // 2. Fetch the profile to ensure the user exists
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('id, username')
     .eq('slug', slug)
     .single()
 
+  // If the database query fails or user isn't found, trigger 404
   if (profileError || !profile) {
+    console.error('Profile fetch error:', profileError)
     notFound()
   }
 
   const { id: profileId, username } = profile
 
+  // 3. Define the Server Action
   async function sendConfession(formData: FormData) {
     'use server'
-
+    
+    // Initialize a separate client inside the action
+    const supabaseAction = await supabaseServer()
     const message = (formData.get('message') as string)?.trim()
 
     if (!message || message.length < 1 || message.length > 1000) {
       redirect(`/confess/${slug}?error=Message must be 1–1000 characters`)
     }
 
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAction
       .from('confessions')
       .insert({
         profile_id: profileId,
@@ -89,7 +97,7 @@ export default async function ConfessPage({ params, searchParams }: PageProps) {
                 name="message"
                 rows={8}
                 placeholder="Say anything... they'll never know it's you ❤️"
-                className="w-full px-5 py-4 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-purple-300 focus:border-purple-500 resize-none transition-shadow"
+                className="w-full px-5 py-4 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-purple-300 focus:border-purple-500 resize-none transition-shadow text-gray-900"
                 required
                 minLength={1}
                 maxLength={1000}
@@ -115,4 +123,5 @@ export default async function ConfessPage({ params, searchParams }: PageProps) {
       </div>
     </div>
   )
-    }
+      }
+        
