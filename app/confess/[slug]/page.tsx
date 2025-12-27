@@ -5,21 +5,27 @@ import { notFound, redirect } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 
 interface PageProps {
-  params: { slug: string }
+  params: { slug?: string }
   searchParams: { status?: string; error?: string }
 }
 
 export default async function ConfessPage({ params, searchParams }: PageProps) {
-  const { slug } = params
+  const slug = params.slug?.trim()
   const { status, error: urlError } = searchParams
+
+  // Early guard: no slug = 404
+  if (!slug) {
+    notFound()
+  }
+
+  const safeSlug = slug.toLowerCase()
 
   const supabase = await supabaseServer()
 
-  // Fetch profile securely
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('id, username')
-    .eq('slug', slug.toLowerCase()) // Ensure case-insensitive match if needed
+    .eq('slug', safeSlug)
     .single()
 
   if (profileError || !profile) {
@@ -28,14 +34,13 @@ export default async function ConfessPage({ params, searchParams }: PageProps) {
 
   const { id: profileId, username } = profile
 
-  // Server Action: Handle confession submission
   async function sendConfession(formData: FormData) {
     'use server'
 
     const message = (formData.get('message') as string)?.trim()
 
     if (!message || message.length < 1 || message.length > 1000) {
-      redirect(`/confess/${slug}?error=Message must be between 1 and 1000 characters`)
+      redirect(`/confess/${slug}?error=Message must be 1–1000 characters`)
     }
 
     const { error: insertError } = await supabase
@@ -46,8 +51,8 @@ export default async function ConfessPage({ params, searchParams }: PageProps) {
       })
 
     if (insertError) {
-      console.error('Failed to insert confession:', insertError)
-      redirect(`/confess/${slug}?error=Failed to send. Please try again.`)
+      console.error('Insert failed:', insertError)
+      redirect(`/confess/${slug}?error=Failed to send confession`)
     }
 
     redirect(`/confess/${slug}?status=success`)
@@ -56,34 +61,29 @@ export default async function ConfessPage({ params, searchParams }: PageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 py-12 px-4">
       <div className="max-w-lg mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden">
-        {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-10 text-white text-center">
           <h1 className="text-3xl md:text-4xl font-bold">Send an Anonymous Confession</h1>
           <p className="text-2xl md:text-3xl mt-4">to @{username}</p>
         </div>
 
-        {/* Main Content */}
         <div className="p-8">
-          {/* Success Feedback */}
           {status === 'success' && (
             <div className="mb-8 p-6 bg-green-50 border border-green-300 rounded-2xl text-center">
               <p className="text-green-800 font-bold text-lg">Confession sent successfully! ✨</p>
-              <p className="text-green-700 mt-2">@{username} will see it in their dashboard.</p>
+              <p className="text-green-700 mt-2">@{username} will see it soon.</p>
             </div>
           )}
 
-          {/* Error Feedback */}
           {urlError && (
             <div className="mb-8 p-6 bg-red-50 border border-red-300 rounded-2xl text-center">
               <p className="text-red-800 font-bold">Error: {urlError}</p>
             </div>
           )}
 
-          {/* Confession Form */}
           <form action={sendConfession} className="space-y-6">
             <div>
               <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-3">
-                Your confession (100% anonymous — no login required)
+                Your confession (100% anonymous)
               </label>
               <textarea
                 id="message"
@@ -107,7 +107,6 @@ export default async function ConfessPage({ params, searchParams }: PageProps) {
             </button>
           </form>
 
-          {/* Privacy Note */}
           <p className="mt-10 text-center text-sm text-gray-600 leading-relaxed">
             This message is <span className="font-semibold">completely anonymous</span>.
             <br />
@@ -117,4 +116,4 @@ export default async function ConfessPage({ params, searchParams }: PageProps) {
       </div>
     </div>
   )
-  }
+            }
