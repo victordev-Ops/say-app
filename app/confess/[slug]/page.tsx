@@ -1,39 +1,42 @@
 // app/confess/[slug]/page.tsx
 import { supabaseServer } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 
-export const dynamic = 'force-dynamic' // Ensures fresh data on each request
+export const dynamic = 'force-dynamic'
 
 export default async function ConfessPage({
   params,
+  searchParams,
 }: {
   params: { slug: string }
+  searchParams: { [key: string]: string | undefined }
 }) {
   const { slug } = params
+  const status = searchParams.status
+  const errorMsg = searchParams.error
 
   const supabase = await supabaseServer()
 
-  // Fetch profile with id and username
-  const { data: profile, error } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('id, username, slug')
     .eq('slug', slug)
     .single()
 
-  if (error || !profile) {
+  if (profileError || !profile) {
     notFound()
   }
 
   const { id: profileId, username } = profile
 
-  // Server Action: Insert confession (anonymous)
+  // Server Action: Send confession and redirect with feedback
   async function sendConfession(formData: FormData) {
     'use server'
 
     const message = (formData.get('message') as string)?.trim()
 
     if (!message || message.length < 1 || message.length > 1000) {
-      return { error: 'Confession must be between 1 and 1000 characters.' }
+      redirect(`/confess/${slug}?error=Message must be 1-1000 characters`)
     }
 
     const { error: insertError } = await supabase
@@ -45,19 +48,11 @@ export default async function ConfessPage({
 
     if (insertError) {
       console.error('Confession insert failed:', insertError)
-      return { error: 'Failed to send. Please try again.' }
+      redirect(`/confess/${slug}?error=Failed to send. Try again later.`)
     }
 
-    // Revalidate the dashboard to show new confession instantly
-    // (requires Next.js 14+ revalidatePath)
-    try {
-      const { revalidatePath } = await import('next/cache')
-      revalidatePath('/dashboard')
-    } catch {
-      // Ignore if not available
-    }
-
-    return { success: true }
+    // Success → redirect with success flag
+    redirect(`/confess/${slug}?status=success`)
   }
 
   return (
@@ -69,6 +64,25 @@ export default async function ConfessPage({
         </div>
 
         <div className="p-8">
+          {/* Success Message */}
+          {status === 'success' && (
+            <div className="mb-8 p-6 bg-green-50 border border-green-300 rounded-2xl text-center">
+              <p className="text-green-800 font-semibold text-lg">
+                Confession sent successfully! ✨
+              </p>
+              <p className="text-green-700 mt-2">
+                It will appear in @{username}'s dashboard soon.
+              </p>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {errorMsg && (
+            <div className="mb-8 p-6 bg-red-50 border border-red-300 rounded-2xl text-center">
+              <p className="text-red-800 font-semibold">Oops! {errorMsg}</p>
+            </div>
+          )}
+
           <form action={sendConfession} className="space-y-6">
             <div>
               <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
@@ -83,6 +97,7 @@ export default async function ConfessPage({
                 required
                 minLength={1}
                 maxLength={1000}
+                defaultValue={status === 'success' ? '' : undefined} // Clear on success
               />
               <p className="mt-2 text-xs text-gray-500 text-right">
                 Max 1000 characters
@@ -99,7 +114,7 @@ export default async function ConfessPage({
 
           <div className="mt-10 text-center">
             <p className="text-sm text-gray-600">
-              This message is completely anonymous. 
+              This message is completely anonymous.
               <br />
               The recipient will never know who sent it.
             </p>
@@ -108,4 +123,4 @@ export default async function ConfessPage({
       </div>
     </div>
   )
-}
+          }
