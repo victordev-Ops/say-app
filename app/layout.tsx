@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import { GeistSans, GeistMono } from "next/font/google"; // ← Correct: GeistSans & GeistMono
+import { GeistSans, GeistMono } from "next/font/google";
 import "./globals.css";
 import BottomNavbar from "@/components/BottomNavbar";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Suspense } from "react";
 
-// Correct font setup
 const geistSans = GeistSans({
   variable: "--font-geist-sans",
   subsets: ["latin"],
