@@ -1,5 +1,4 @@
-// components/LogoutButton.tsx (or wherever it's located)
-
+// components/LogoutButton.tsx
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
@@ -14,24 +13,27 @@ export default function LogoutButton() {
 
   const handleLogout = async () => {
     setIsLoading(true)
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    
-    // Redirect to settings page after logout
-    router.push('/settings')
-    
-    setIsLoading(false)
-  }
 
-  const initiateLogout = () => setShowConfirm(true)
-  const cancelLogout = () => setShowConfirm(false)
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+
+      // Clean redirect + signal to settings page
+      router.replace('/settings?loggedOut=true')
+      // Do NOT setIsLoading(false) here — the component will unmount anyway
+    } catch (error) {
+      console.error('Logout failed:', error)
+      setIsLoading(false)
+    }
+
+    setShowConfirm(false)
+  }
 
   return (
     <>
       <button
-        onClick={initiateLogout}
+        onClick={() => setShowConfirm(true)}
         disabled={isLoading}
-        aria-label="Log out"
         className="flex w-full items-center justify-center gap-3 rounded-lg px-6 py-3 text-left font-medium text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
       >
         <LogOut className="h-5 w-5" />
@@ -41,15 +43,11 @@ export default function LogoutButton() {
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">
-              Confirm logout
-            </h2>
-            <p className="mb-6 text-gray-600">
-              Are you sure you want to log out?
-            </p>
+            <h2 className="mb-4 text-xl font-semibold text-gray-900">Confirm logout</h2>
+            <p className="mb-6 text-gray-600">Are you sure you want to log out?</p>
             <div className="flex gap-3">
               <button
-                onClick={cancelLogout}
+                onClick={() => setShowConfirm(false)}
                 disabled={isLoading}
                 className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 transition hover:bg-gray-100"
               >
@@ -60,7 +58,7 @@ export default function LogoutButton() {
                 disabled={isLoading}
                 className="flex-1 rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
               >
-                {isLoading ? 'Logging out...' : 'Log out'}
+                {isLoading ? 'Logging out...' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -68,4 +66,4 @@ export default function LogoutButton() {
       )}
     </>
   )
-                }
+          }
