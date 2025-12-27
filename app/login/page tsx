@@ -14,7 +14,7 @@ export default function Login() {
     setMessage('')
 
     try {
-      await signUp(email)
+      await signUp(email.trim())
       setMessage('Magic link sent! Check your email.')
       setEmail('')
     } catch (err: any) {
@@ -23,18 +23,42 @@ export default function Login() {
   }
 
   return (
-    <AuthForm>
-      <h1 className="text-2xl font-bold mb-4">Log in</h1>
-      <p className="text-sm text-gray-600 mb-6">
-        Enter your email and we'll send you a magic link.
-      </p>
+    <div className="min-h-screen bg-gray-50 py-12 px-4">
+      <div className="max-w-md mx-auto">
+        <AuthForm>
+          <h1 className="text-2xl font-bold mb-4 text-center">Log in</h1>
+          <p className="text-sm text-gray-600 mb-6 text-center">
+            Enter your email and we'll send you a magic link.
+          </p>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <input
-          type="email"
-          placeholder="Your email"
-          className="input"
-          value={email}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <input
+              type="email"
+              placeholder="Your email"
+              className="input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <button type="submit" className="btn-primary mt-2">
+              Send magic link
+            </button>
+          </form>
+
+          {message && (
+            <p className={`mt-4 text-center text-sm ${message.includes('sent') ? 'text-green-600' : 'text-red-600'}`}>
+              {message}
+            </p>
+          )}
+        </AuthForm>
+
+        <p className="mt-8 text-center text-sm text-gray-600">
+          New here? We'll create an account automatically on first login.
+        </p>
+      </div>
+    </div>
+  )
+}          value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
         />
