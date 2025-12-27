@@ -53,5 +53,9 @@ export default function Login() {
         New here? Just use your email — we'll create an account if needed.
       </p>
     </AuthForm>
+
+    <p className="mt-6 text-center text-sm text-gray-600">
+  Don't have an account? It will be created automatically on first login.
+</p>
   )
         }
