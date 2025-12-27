@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNavbar from "@/components/BottomNavbar";
-import { createServerClient } from "@/lib/supabase/server";
+import supabaseServer from "@/lib/supabase/server"; // ✅ corrected
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const supabase = await createServerClient();
+  const supabase = await supabaseServer(); // ✅ corrected
 
   // Get logged-in user
   const {
