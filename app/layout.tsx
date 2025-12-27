@@ -1,20 +1,12 @@
 import type { Metadata } from "next";
-import { GeistSans, GeistMono } from "next/font/google";
+import { GeistSans, GeistMono } from "geist/font";  // ← New official import
 import "./globals.css";
 import BottomNavbar from "@/components/BottomNavbar";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Suspense } from "react";
 
-// Critical: These are the EXACT correct names
-const geistSans = GeistSans({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = GeistMono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const geistSans = GeistSans;  // Already configured with variable
+const geistMono = GeistMono;  // Already configured with variable
 
 export const metadata: Metadata = {
   title: "say",
@@ -41,10 +33,8 @@ export default async function RootLayout({
   const profileId = user?.id ?? null;
 
   return (
-    <html lang="en">
-      <body
-        className={`\( {geistSans.variable} \){geistMono.variable} font-sans antialiased min-h-screen bg-gray-50 pb-24`}
-      >
+    <html lang="en" className={`\( {geistSans.variable} \){geistMono.variable}`}>
+      <body className="font-sans antialiased min-h-screen bg-gray-50 pb-24">
         {children}
 
         <Suspense fallback={<BottomNavbarFallback />}>
@@ -57,4 +47,4 @@ export default async function RootLayout({
       </body>
     </html>
   );
-    }
+        }
