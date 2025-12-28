@@ -28,6 +28,7 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
         .eq('is_read', false)
 
       unreadCountRef.current = count || 0
+      hasNewMessage.current = count > 0
     }
 
     if (profileId) fetchUnread()
@@ -50,8 +51,7 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
         () => {
           unreadCountRef.current += 1
           hasNewMessage.current = true
-          // Trigger re-render
-          router.refresh() // Soft refresh to update badge without full reload
+          router.refresh()
         }
       )
       .subscribe()
@@ -64,11 +64,9 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
   // Mark all as read when inbox is visited
   useEffect(() => {
     if (isInboxActive && unreadCountRef.current > 0) {
-      // Optimistic update
       unreadCountRef.current = 0
       hasNewMessage.current = false
 
-      // Fire and forget — no need to await
       supabase
         .from('confessions')
         .update({ is_read: true })
@@ -80,6 +78,15 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
 
   const unreadCount = unreadCountRef.current
 
+  const tabClass = (isActive: boolean) =>
+    `group relative flex flex-col items-center gap-1 p-4 rounded-2xl transition-all duration-200 ${
+      isActive
+        ? 'text-purple-600'
+        : 'text-gray-500 hover:text-purple-600'
+    }`
+
+  const iconClass = "group-active:scale-90 transition-transform"
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-gray-200 px-4 py-3 z-50">
       <div className="max-w-2xl mx-auto">
@@ -88,46 +95,39 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
           <Link
             href="/dashboard"
             prefetch={true}
-            className={`group relative flex flex-col items-center gap-1 p-4 rounded-2xl transition-all duration-200 ${
-              isHomeActive
-                ? 'text-purple-600'
-                : 'text-gray-500 hover:text-purple-600'
-            }`}
-            onClick={(e) => {
-              if (isHomeActive) e.preventDefault()
-            }}
+            className={tabClass(isHomeActive)}
+            onClick={(e) => isHomeActive && e.preventDefault()}
           >
-            <Home size={26} strokeWidth={2.5} className="group-active:scale-90 transition-transform" />
+            <Home size={26} strokeWidth={2.5} className={iconClass} />
             <span className="text-xs font-medium">Home</span>
             {isHomeActive && (
               <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-12 h-1 bg-purple-600 rounded-full" />
             )}
           </Link>
 
-          {/* Inbox (Center - Prominent) */}
+          {/* Inbox */}
           <Link
             href="/inbox"
             prefetch={true}
-            className={`relative -mt-6 p-5 rounded-full transition-all duration-300 shadow-lg ${
-              isInboxActive
-                ? 'bg-purple-600 text-white scale-110 shadow-purple-300'
-                : 'bg-white text-gray-700 ring-4 ring-purple-100 shadow-xl'
-            }`}
-            onClick={(e) => {
-              if (isInboxActive) e.preventDefault()
-            }}
+            className={tabClass(isInboxActive)}
+            onClick={(e) => isInboxActive && e.preventDefault()}
           >
-            <Inbox size={32} strokeWidth={2.5} className="relative z-10" />
-
-            {/* Smart Badge: Only animate on new messages */}
-            {unreadCount > 0 && (
-              <span
-                className={`absolute -top-2 -right-2 flex items-center justify-center min-w-6 h-6 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg transition-all ${
-                  hasNewMessage.current ? 'animate-ping-once' : ''
-                }`}
-              >
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
+            <div className="relative">
+              <Inbox size={26} strokeWidth={2.5} className={iconClass} />
+              {/* Unread badge */}
+              {unreadCount > 0 && (
+                <span
+                  className={`absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white shadow-lg transition-all ${
+                    hasNewMessage.current ? 'animate-ping-once' : ''
+                  }`}
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </div>
+            <span className="text-xs font-medium">Inbox</span>
+            {isInboxActive && (
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-12 h-1 bg-purple-600 rounded-full" />
             )}
           </Link>
 
@@ -135,16 +135,10 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
           <Link
             href="/settings"
             prefetch={true}
-            className={`group relative flex flex-col items-center gap-1 p-4 rounded-2xl transition-all duration-200 ${
-              isSettingsActive
-                ? 'text-purple-600'
-                : 'text-gray-500 hover:text-purple-600'
-            }`}
-            onClick={(e) => {
-              if (isSettingsActive) e.preventDefault()
-            }}
+            className={tabClass(isSettingsActive)}
+            onClick={(e) => isSettingsActive && e.preventDefault()}
           >
-            <Settings size={26} strokeWidth={2.5} className="group-active:scale-90 transition-transform" />
+            <Settings size={26} strokeWidth={2.5} className={iconClass} />
             <span className="text-xs font-medium">Settings</span>
             {isSettingsActive && (
               <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-12 h-1 bg-purple-600 rounded-full" />
@@ -153,7 +147,7 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
         </div>
       </div>
 
-      {/* Custom animation for new message pulse */}
+      {/* Custom ping animation */}
       <style jsx>{`
         @keyframes ping-once {
           0% {
@@ -175,4 +169,4 @@ export default function BottomNavbar({ profileId }: { profileId: string }) {
       `}</style>
     </div>
   )
-          }
+        }
